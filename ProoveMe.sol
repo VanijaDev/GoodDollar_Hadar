@@ -1,42 +1,27 @@
-//  "SPDX-License-Identifier: MIT"
+// SPDX-License-Identifier: MIT
 
-pragma solidity 0.7.0;
+pragma solidity ^0.7.4;
 
 contract ProoveMe {
-    mapping(address => bytes32) public testForAddress;
-
+    mapping (address => address) public provedOwnerForOwned;
+    
     event Owner(address owner, address owned);
+    
+    
+    
+    function prooveMe(address _ownedAddr, bytes32 _messageHash, bytes memory _signature) external {
+        require(provedOwnerForOwned[_ownedAddr] == address(0), "owner present");
+        
+        (uint8 v, bytes32 r, bytes32 s) = splitSignature(_signature);
 
-    function register() external {
-        require(testForAddress[msg.sender] == 0x0, "Already registered");
-
-        testForAddress[msg.sender] = keccak256(abi.encodePacked(msg.sender));
+        address signerAddr = ecrecover(_messageHash, v, r, s);
+        require(signerAddr == _ownedAddr, "Not owner");
+        
+        provedOwnerForOwned[_ownedAddr] = msg.sender;
+        emit Owner(msg.sender, _ownedAddr);
     }
-
-    function prooveMe(
-        bytes32 _testForAddress,
-        bytes32 __testForAddressHash,
-        bytes memory _proof
-    ) external {
-        require(testForAddress[msg.sender] == _testForAddress, "Wrong test");
-
-        (uint8 v, bytes32 r, bytes32 s) = splitSignature(_proof);
-
-        address ownerAddr = ecrecover(__testForAddressHash, v, r, s);
-        require(ownerAddr == msg.sender, "Not owner");
-
-        emit Owner(msg.sender, address(this));
-    }
-
-    function splitSignature(bytes memory sig)
-        private
-        pure
-        returns (
-            uint8 v,
-            bytes32 r,
-            bytes32 s
-        )
-    {
+    
+    function splitSignature(bytes memory sig) private pure returns (uint8 v, bytes32 r, bytes32 s) {
         require(sig.length == 65);
 
         assembly {
@@ -51,11 +36,7 @@ contract ProoveMe {
         return (v, r, s);
     }
 
-    function recoverSigner(bytes32 message, bytes memory sig)
-        private
-        pure
-        returns (address)
-    {
+    function recoverSigner(bytes32 message, bytes memory sig) private pure returns (address) {
         (uint8 v, bytes32 r, bytes32 s) = splitSignature(sig);
 
         return ecrecover(message, v, r, s);
